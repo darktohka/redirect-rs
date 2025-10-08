@@ -1,0 +1,18 @@
+[package]
+name = "redirect-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"], default-features = false }
+hyper = { version = "1", features = ["server", "http1"], default-features = false }
+regex-lite = "0.1"
+http-body-util = "0"
+hyper-util = { version = "0", features = ["server", "http1", "tokio"], default-features = false }
+
+[profile.release-lto]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+strip = true
+strip-paths = true
