@@ -261,6 +261,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "regex-lite",
+ "socket2",
  "tokio",
 ]
 

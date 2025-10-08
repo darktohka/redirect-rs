@@ -9,6 +9,7 @@ hyper = { version = "1", features = ["server", "http1"], default-features = fals
 regex-lite = "0.1"
 http-body-util = "0"
 hyper-util = { version = "0", features = ["server", "http1", "tokio"], default-features = false }
+socket2 = { version = "0", features = [], default-features = false }
 
 [profile.release-lto]
 inherits = "release"

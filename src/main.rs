@@ -5,10 +5,11 @@ use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use regex_lite::Regex;
+use socket2::{Domain, Socket, Type};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::env;
-use std::net::SocketAddr;
+use std::net::{Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
@@ -73,8 +74,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(3000);
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    let listener = TcpListener::bind(addr).await?;
+    let addr = SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), port);
+
+    let socket = Socket::new(Domain::IPV6, Type::STREAM, None)?;
+    socket.set_reuse_address(true)?;
+    socket.set_only_v6(false)?;
+    socket.bind(&addr.into())?;
+    socket.listen(1024)?;
+    socket.set_nonblocking(true)?; // Set socket to non-blocking mode
+
+    let listener = TcpListener::from_std(socket.into())?;
 
     let redirect_rules = Arc::new(rules);
 
@@ -117,6 +126,12 @@ async fn handle_request(
         .and_then(|h| h.to_str().ok())
         .unwrap_or("");
     let path = format!("{}{}", host, req.uri());
+    let fallback_ip = original_ip_address.unwrap_or("unknown".to_string());
+    let ip_address = req
+        .headers()
+        .get("x-forwarded-for")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or(fallback_ip.as_ref());
 
     for rule in rules.iter() {
         if rule.from.is_match(&path) {
@@ -126,17 +141,12 @@ async fn handle_request(
                 .header(hyper::header::LOCATION, redirected_path.as_ref())
                 .body(Full::new(Bytes::new()))
                 .unwrap();
-            let fallback_ip = original_ip_address.unwrap_or("unknown".to_string());
-            let ip_address = req
-                .headers()
-                .get("x-forwarded-for")
-                .and_then(|h| h.to_str().ok())
-                .unwrap_or(fallback_ip.as_ref());
             println!("[{}] {} -> {}", ip_address, path, redirected_path);
             return Ok(response);
         }
     }
 
+    println!("[{}] {} -> 404", ip_address, path);
     let mut not_found = Response::new(Full::new(Bytes::from("Not Found")));
     *not_found.status_mut() = StatusCode::NOT_FOUND;
     Ok(not_found)
