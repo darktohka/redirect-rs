@@ -137,7 +137,7 @@ async fn handle_request(
         if rule.from.is_match(&path) {
             let redirected_path = rule.from.replace_all(&path, &rule.to[..]);
             let response = Response::builder()
-                .status(StatusCode::FOUND)
+                .status(StatusCode::MOVED_PERMANENTLY)
                 .header(hyper::header::LOCATION, redirected_path.as_ref())
                 .body(Full::new(Bytes::new()))
                 .unwrap();
